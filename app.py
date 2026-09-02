@@ -1,8 +1,11 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import os
+from sklearn.datasets import load_iris
+from sklearn.ensemble import RandomForestClassifier
 
-# Set page title
+# Set page configuration
 st.set_page_config(page_title="Iris Flower Classification App", page_icon="🌸")
 
 # Title and Description
@@ -33,34 +36,42 @@ input_df = get_user_input()
 st.subheader("Selected Input Features:")
 st.write(input_df)
 
-# Load the trained model
-try:
-    model = joblib.load("iris_model.joblib")
-except Exception as e:
-    st.error(f"Could not load model: {e}")
-    model = None
+# Robust model loader
+@st.cache_resource
+def load_model():
+    if os.path.exists("iris_model.joblib"):
+        try:
+            return joblib.load("iris_model.joblib")
+        except Exception:
+            pass
+    # Fallback: train on the fly if file is absent or version mismatch
+    iris = load_iris()
+    clf = RandomForestClassifier(n_estimators=100, random_state=42)
+    clf.fit(iris.data, iris.target)
+    return clf
+
+model = load_model()
 
 # Prediction button
 if st.button("Predict Species"):
-    if model is not None:
-        species_names = ['Iris Setosa', 'Iris Versicolor', 'Iris Virginica']
-        
-        # Make prediction
-        prediction_index = model.predict(input_df)[0]
-        prediction_probabilities = model.predict_proba(input_df)[0]
-        
-        # Display Result
-        st.subheader("Prediction:")
-        st.success(f"Predicted Species: **{species_names[prediction_index]}**")
-        
-        # Display Probabilities
-        st.subheader("Prediction Probabilities:")
-        prob_df = pd.DataFrame({
-            'Species': species_names,
-            'Probability (%)': [round(p * 100, 2) for p in prediction_probabilities]
-        })
-        st.write(prob_df)
-        
-        # Bar chart
-        chart_data = prob_df.set_index('Species')
-        st.bar_chart(chart_data)
+    species_names = ['Iris Setosa', 'Iris Versicolor', 'Iris Virginica']
+    
+    # Make prediction
+    prediction_index = model.predict(input_df)[0]
+    prediction_probabilities = model.predict_proba(input_df)[0]
+    
+    # Display Result
+    st.subheader("Prediction:")
+    st.success(f"Predicted Species: **{species_names[prediction_index]}**")
+    
+    # Display Probabilities
+    st.subheader("Prediction Probabilities:")
+    prob_df = pd.DataFrame({
+        'Species': species_names,
+        'Probability (%)': [round(p * 100, 2) for p in prediction_probabilities]
+    })
+    st.write(prob_df)
+    
+    # Bar chart
+    chart_data = prob_df.set_index('Species')
+    st.bar_chart(chart_data)
